@@ -1,0 +1,49 @@
+#!/bin/bash
+# log-archive: compress a log directory into a timestamped tar.gz and record it in a log file
+
+usage() {
+    echo "Usage: $0 <log-directory> [archive-directory]" >&2
+    exit 1
+}
+
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    usage
+fi
+
+src=$1
+dest=${2:-$HOME/log-archives}
+
+if [ ! -d "$src" ]; then
+    echo "Error: '$src' is not a directory." >&2
+    exit 1
+fi
+
+if ! command -v tar > /dev/null 2>&1; then
+    echo "Error: 'tar' is required but not installed." >&2
+    exit 1
+fi
+
+if ! mkdir -p "$dest"; then
+    echo "Error: cannot create '$dest'." >&2
+    exit 1
+fi
+
+timestamp=$(date +%Y%m%d_%H%M%S)
+archive="$dest/logs_archive_${timestamp}.tar.gz"
+
+tar -czf "$archive" -C "$src" .
+status=$?
+
+if [ "$status" -gt 1 ]; then
+    rm -f "$archive"
+    echo "Error: tar failed (exit $status); no archive was kept." >&2
+    exit "$status"
+fi
+
+if [ "$status" -eq 1 ]; then
+    echo "Warning: some files changed while being archived." >&2
+fi
+
+size=$(du -h "$archive" | cut -f1)
+echo "$(date '+%Y-%m-%d %H:%M:%S') archived $src -> $archive ($size)" >> "$dest/archive.log"
+echo "Archive created: $archive ($size)"
